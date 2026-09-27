@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import sys
+import uuid
 
 BUMPS = ("none", "patch", "minor", "major")
 
@@ -91,10 +92,23 @@ def classify(commits, model):
     ]
 
 
+CHANGELOG_SECTIONS = {"major": "Breaking changes", "minor": "Features", "patch": "Fixes and maintenance"}
+
+
+def changelog(decisions):
+    sections = []
+    for bump, heading in CHANGELOG_SECTIONS.items():
+        entries = [f"- {d['subject']} ({d['sha'][:7]})" for d in decisions if d["bump"] == bump]
+        if entries:
+            sections.append("\n".join([f"### {heading}", *entries]))
+    return "\n\n".join(sections)
+
+
 def write_outputs(outputs):
     with open(os.environ["GITHUB_OUTPUT"], "a") as file:
         for key, value in outputs.items():
-            file.write(f"{key}={value}\n")
+            delimiter = f"EOF_{uuid.uuid4().hex}"
+            file.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
 def escape_cell(text):
@@ -140,6 +154,7 @@ def main():
         "next-version": next_version,
         "next-tag": f"{prefix}{next_version}",
         "decisions": json.dumps(decisions),
+        "changelog": changelog(decisions),
     }
     write_outputs(outputs)
     write_summary(decisions, outputs)

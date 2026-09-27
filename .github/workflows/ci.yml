@@ -30,6 +30,7 @@ jobs:
         uses: ./
       - run: echo "${{ steps.bump.outputs.current-version }} -> ${{ steps.bump.outputs.next-version }} (${{ steps.bump.outputs.bump }})"
       - if: github.event_name == 'push' && steps.bump.outputs.bump != 'none'
-        run: gh release create "${{ steps.bump.outputs.next-tag }}" --target "$GITHUB_SHA" --generate-notes
+        run: gh release create "${{ steps.bump.outputs.next-tag }}" --target "$GITHUB_SHA" --notes "$CHANGELOG" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+          CHANGELOG: ${{ steps.bump.outputs.changelog }}

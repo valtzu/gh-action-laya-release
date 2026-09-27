@@ -1,6 +1,6 @@
 import pytest
 
-from laya_release import bump_version, highest_bump, latest_tag, parse_tag
+from laya_release import bump_version, changelog, highest_bump, latest_tag, parse_tag
 
 
 @pytest.mark.parametrize("tag, expected", [("v1.2.3", ("v", (1, 2, 3))), ("1.2.3", ("", (1, 2, 3)))])
@@ -44,3 +44,11 @@ def test_highest_bump_uses_fallback_when_nothing_is_confident():
 
 def test_highest_bump_is_none_without_commits():
     assert highest_bump([], 0.5, "patch") == "none"
+
+
+def test_changelog_groups_subjects_by_bump():
+    decisions = [
+        {"sha": "a" * 40, "subject": "Fix crash", "bump": "patch"},
+        {"sha": "b" * 40, "subject": "Add option", "bump": "minor"},
+    ]
+    assert changelog(decisions) == "### Features\n- Add option (bbbbbbb)\n\n### Fixes and maintenance\n- Fix crash (aaaaaaa)"

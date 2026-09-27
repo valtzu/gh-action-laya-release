@@ -32,9 +32,10 @@ jobs:
         uses: valtzu/gh-action-laya-release@main
 
       - if: steps.bump.outputs.bump != 'none'
-        run: gh release create "${{ steps.bump.outputs.next-tag }}" --generate-notes
+        run: gh release create "${{ steps.bump.outputs.next-tag }}" --notes "$CHANGELOG" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+          CHANGELOG: ${{ steps.bump.outputs.changelog }}
 ```
 
 `fetch-depth: 0` is required so tags and history are available.
@@ -60,6 +61,7 @@ jobs:
 | `next-version` | Next version without prefix |
 | `next-tag` | Next version with the previous tag's prefix (`v` if no previous tag) |
 | `decisions` | JSON array of per-commit decisions |
+| `changelog` | Markdown list of commit subjects grouped into breaking changes, features, and fixes |
 
 A per-commit table is also written to the job summary.
 

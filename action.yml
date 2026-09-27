@@ -43,6 +43,9 @@ outputs:
   decisions:
     description: JSON array of per-commit decisions
     value: ${{ steps.decide.outputs.decisions }}
+  changelog:
+    description: Markdown list of commit subjects grouped by bump
+    value: ${{ steps.decide.outputs.changelog }}
 
 runs:
   using: composite
