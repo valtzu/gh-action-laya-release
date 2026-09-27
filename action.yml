@@ -17,6 +17,15 @@ inputs:
   fallback-bump:
     description: Bump to use when there are commits but none were classified confidently (none, patch, minor, major)
     default: patch
+  no-release-paths:
+    description: Whitespace separated fnmatch patterns ("*" also matches "/"); commits changing only matching files get bump "none" without asking laya
+    default: |
+      *.md
+      LICENSE*
+      docs/*
+      tests/*
+      test/*
+      .github/*
   laya-version:
     description: Version of the laya package to install
     default: "0.3.21"
@@ -72,4 +81,5 @@ runs:
         INPUT_MODEL: ${{ inputs.model }}
         INPUT_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
         INPUT_FALLBACK_BUMP: ${{ inputs.fallback-bump }}
+        INPUT_NO_RELEASE_PATHS: ${{ inputs.no-release-paths }}
       run: python "$GITHUB_ACTION_PATH/laya_release.py"

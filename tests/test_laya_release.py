@@ -1,6 +1,6 @@
 import pytest
 
-from laya_release import bump_version, changelog, decide, describe, highest_bump, latest_tag, parse_tag
+from laya_release import bump_version, changelog, describe, highest_bump, latest_tag, only_touches, parse_tag
 
 
 @pytest.mark.parametrize("tag, expected", [("v1.2.3", ("v", (1, 2, 3))), ("1.2.3", ("", (1, 2, 3)))])
@@ -58,20 +58,17 @@ def test_highest_bump_is_none_when_only_non_release_changes_are_confident():
     assert highest_bump([{"bump": "none", "confidence": 0.8}], 0.5, "patch") == "none"
 
 
-def test_decide_skips_release_for_docs_tests_or_ci_only():
-    answers = {
-        "bump": {"choice": "C", "answer_confidence": 0.6},
-        "scope": {"choice": "B", "answer_confidence": 0.7},
-    }
-    assert decide(answers) == ("none", 0.7)
-
-
-def test_decide_uses_bump_label_for_source_changes():
-    answers = {
-        "bump": {"choice": "B", "answer_confidence": 0.6},
-        "scope": {"choice": "A", "answer_confidence": 0.9},
-    }
-    assert decide(answers) == ("minor", 0.6)
+@pytest.mark.parametrize(
+    "files, expected",
+    [
+        (["README.md", "docs/guide/usage.md"], True),
+        ([".github/workflows/ci.yml", "tests/test_a.py"], True),
+        (["action.yml", "README.md"], False),
+        ([], False),
+    ],
+)
+def test_only_touches(files, expected):
+    assert only_touches(files, ["*.md", "docs/*", "tests/*", ".github/*"]) is expected
 
 
 def test_describe_lists_changed_files():

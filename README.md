@@ -2,14 +2,14 @@
 
 GitHub Action that decides whether the next release is **major**, **minor** or **patch** by classifying each commit message since the latest version tag (`1.2.3` or `v1.2.3`) with [laya](https://github.com/NandhaKishorM/laya).
 
-Each commit message, together with its changed file names, gets one of four labels; the highest confident one wins:
+Commits that change only files matching `no-release-paths` (docs, tests, CI by default) get `none`. Every other commit message, together with its changed file names, is labelled by laya. The highest confident label wins:
 
 | Bump | Meaning |
 |---|---|
 | major | breaks existing users: removes or renames API, flags or behavior |
 | minor | adds a new feature, option or command |
 | patch | fixes a bug, or changes dependencies or internals |
-| none | changes only documentation, tests or CI configuration |
+| none | changes only files matching `no-release-paths` |
 
 Decisions below `min-confidence` are ignored. If commits exist but none is confident, `fallback-bump` is used. Without commits since the tag, or when every confident decision is `none`, the bump is `none` and no release should be made.
 
@@ -49,6 +49,7 @@ jobs:
 | `model` | `english` | Laya checkpoint (`english`, `multilingual`, `typed-decisions`); empty lets the router pick |
 | `min-confidence` | `0.4` | Ignore decisions below this confidence |
 | `fallback-bump` | `patch` | Bump when no decision is confident |
+| `no-release-paths` | `*.md LICENSE* docs/* tests/* test/* .github/*` | Whitespace separated [fnmatch](https://docs.python.org/3/library/fnmatch.html) patterns (`*` also matches `/`); commits changing only matching files don't trigger a release |
 | `laya-version` | `0.3.21` | laya package version |
 | `python-version` | `3.12` | Python version |
 

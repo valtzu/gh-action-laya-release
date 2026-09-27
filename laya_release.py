@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from fnmatch import fnmatch
 import subprocess
 import sys
 import uuid
@@ -17,14 +18,6 @@ QUESTIONS = {
             "A": "breaks existing users: removes or renames API, flags or behavior",
             "B": "adds a new feature, option or command",
             "C": "fixes a bug, or changes only docs, dependencies, tests or internals",
-        },
-    },
-    "scope": {
-        "type": "choice",
-        "instructions": "Which files does this commit change?",
-        "criteria": {
-            "A": "source code or dependencies",
-            "B": "only documentation, tests or CI configuration",
         },
     },
 }
@@ -69,10 +62,8 @@ def describe(commit):
     return f"{commit['message']}\n\nChanged files:\n{files}"
 
 
-def decide(answers):
-    if answers["scope"]["choice"] == "B":
-        return "none", answers["scope"]["answer_confidence"]
-    return LABEL_BUMPS[answers["bump"]["choice"]], answers["bump"]["answer_confidence"]
+def only_touches(files, patterns):
+    return bool(files) and all(any(fnmatch(file, pattern) for pattern in patterns) for file in files)
 
 
 def bump_version(version, bump):
@@ -99,23 +90,25 @@ def highest_bump(decisions, min_confidence, fallback):
     return max(confident, key=BUMPS.index)
 
 
-def classify(commits, model):
-    from laya import Router
+def classify(commits, model, no_release_paths):
+    releasable = [c for c in commits if not only_touches(c["files"], no_release_paths)]
+    answers = {}
+    if releasable:
+        from laya import Router
 
-    requests = [{"state": describe(c), "questions": QUESTIONS, "model": model} for c in commits]
-    results = Router().predict_batch(requests) if requests else []
-    decisions = []
-    for commit, result in zip(commits, results):
-        bump, confidence = decide(result["answers"])
-        decisions.append(
-            {
-                "sha": commit["sha"],
-                "subject": commit["message"].splitlines()[0],
-                "bump": bump,
-                "confidence": confidence,
-            }
-        )
-    return decisions
+        requests = [{"state": describe(c), "questions": QUESTIONS, "model": model} for c in releasable]
+        results = Router().predict_batch(requests)
+        answers = {c["sha"]: r["answers"]["bump"] for c, r in zip(releasable, results)}
+    return [decision(commit, answers.get(commit["sha"])) for commit in commits]
+
+
+def decision(commit, answer):
+    return {
+        "sha": commit["sha"],
+        "subject": commit["message"].splitlines()[0],
+        "bump": LABEL_BUMPS[answer["choice"]] if answer else "none",
+        "confidence": answer["answer_confidence"] if answer else 1.0,
+    }
 
 
 CHANGELOG_SECTIONS = {
@@ -169,12 +162,13 @@ def main():
     model = os.environ["INPUT_MODEL"] or None
     min_confidence = float(os.environ["INPUT_MIN_CONFIDENCE"])
     fallback = os.environ["INPUT_FALLBACK_BUMP"]
+    no_release_paths = os.environ["INPUT_NO_RELEASE_PATHS"].split()
     if fallback not in BUMPS:
         sys.exit(f"fallback-bump must be one of {', '.join(BUMPS)}")
 
     tag = latest_tag(git("tag", "--merged", head).split())
     prefix, current = parse_tag(tag) if tag else ("v", (0, 0, 0))
-    decisions = classify(commits_since(tag, head), model)
+    decisions = classify(commits_since(tag, head), model, no_release_paths)
     bump = highest_bump(decisions, min_confidence, fallback)
     next_version = format_version(bump_version(current, bump))
 
