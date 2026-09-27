@@ -1,0 +1,69 @@
+# Laya release bump
+
+GitHub Action that decides whether the next release is **major**, **minor** or **patch** by classifying each commit message since the latest version tag with [laya](https://github.com/NandhaKishorM/laya).
+
+Each commit gets one of three labels; the highest confident one wins:
+
+| Bump | Meaning |
+|---|---|
+| major | breaks existing users: removes or renames API, flags or behavior |
+| minor | adds a new feature, option or command |
+| patch | fixes a bug, or changes only docs, dependencies, tests or internals |
+
+Decisions below `min-confidence` are ignored. If commits exist but none is confident, `fallback-bump` is used. Without commits since the tag, the bump is `none`.
+
+## Usage
+
+```yaml
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: bump
+        uses: valtzu/gh-action-laya-release@main
+
+      - if: steps.bump.outputs.bump != 'none'
+        run: gh release create "${{ steps.bump.outputs.next-tag }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+```
+
+`fetch-depth: 0` is required so tags and history are available.
+
+## Inputs
+
+| Name | Default | Description |
+|---|---|---|
+| `tag-prefix` | `v` | Prefix of version tags |
+| `head` | `HEAD` | Revision to compare against the latest version tag |
+| `model` | `english` | Laya checkpoint (`english`, `multilingual`, `typed-decisions`); empty lets the router pick |
+| `min-confidence` | `0.4` | Ignore decisions below this confidence |
+| `fallback-bump` | `patch` | Bump when no decision is confident |
+| `laya-version` | `0.3.21` | laya package version |
+| `python-version` | `3.12` | Python version |
+
+## Outputs
+
+| Name | Description |
+|---|---|
+| `previous-tag` | Latest version tag, empty if none |
+| `current-version` | Version of that tag, `0.0.0` if none |
+| `bump` | `none`, `patch`, `minor` or `major` |
+| `next-version` | Next version without prefix |
+| `next-tag` | Next version with prefix |
+| `decisions` | JSON array of per-commit decisions |
+
+A per-commit table is also written to the job summary.
+
+## Caveats
+
+Laya is a small zero-shot classifier, not an LLM. The label wording was picked because it classified a handful of sample commits correctly on the `english` checkpoint; other checkpoints and wordings did noticeably worse. Review the job summary before trusting a major bump.

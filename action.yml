@@ -1,0 +1,76 @@
+name: Laya release bump
+description: Decide whether the next release is major, minor or patch by classifying commit messages with laya
+branding:
+  icon: tag
+  color: blue
+
+inputs:
+  tag-prefix:
+    description: Prefix of version tags, e.g. "v" for v1.2.3
+    default: v
+  head:
+    description: Revision to compare against the latest version tag
+    default: HEAD
+  model:
+    description: Laya checkpoint to use (english, multilingual, typed-decisions); empty lets the router pick
+    default: english
+  min-confidence:
+    description: Ignore commit decisions whose confidence is below this value
+    default: "0.4"
+  fallback-bump:
+    description: Bump to use when there are commits but none were classified confidently (none, patch, minor, major)
+    default: patch
+  laya-version:
+    description: Version of the laya package to install
+    default: "0.3.21"
+  python-version:
+    description: Python version to run laya with
+    default: "3.12"
+
+outputs:
+  previous-tag:
+    description: Latest version tag, empty if none exists
+    value: ${{ steps.decide.outputs.previous-tag }}
+  current-version:
+    description: Version of the latest tag, 0.0.0 if none exists
+    value: ${{ steps.decide.outputs.current-version }}
+  bump:
+    description: none, patch, minor or major
+    value: ${{ steps.decide.outputs.bump }}
+  next-version:
+    description: Next version without prefix
+    value: ${{ steps.decide.outputs.next-version }}
+  next-tag:
+    description: Next version with prefix
+    value: ${{ steps.decide.outputs.next-tag }}
+  decisions:
+    description: JSON array of per-commit decisions
+    value: ${{ steps.decide.outputs.decisions }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/huggingface
+        key: laya-hf-${{ runner.os }}-${{ inputs.laya-version }}-${{ inputs.model }}
+
+    - name: Install laya
+      shell: bash
+      run: |
+        python -m pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+        python -m pip install --quiet "laya==${{ inputs.laya-version }}"
+
+    - id: decide
+      shell: bash
+      env:
+        INPUT_TAG_PREFIX: ${{ inputs.tag-prefix }}
+        INPUT_HEAD: ${{ inputs.head }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
+        INPUT_FALLBACK_BUMP: ${{ inputs.fallback-bump }}
+      run: python "$GITHUB_ACTION_PATH/laya_release.py"
