@@ -2,6 +2,12 @@
 
 GitHub Action that decides whether the next release is **major**, **minor** or **patch** by classifying each commit message since the latest version tag (`1.2.3` or `v1.2.3`) with [laya](https://github.com/NandhaKishorM/laya).
 
+## Why
+
+Tools that derive versions from commits usually require a format such as [Conventional Commits](https://www.conventionalcommits.org/). That works, but it is one more rule a first-time contributor has to learn before their change can land, and one more thing reviewers have to point out. This action tries to keep that bar low: write commit messages the way you normally would, and let the release version follow from what the changes say.
+
+## How it works
+
 Commits that change only files matching `no-release-paths` (docs, tests, CI by default) get `none`. Every other commit message, together with its changed file names, is labelled by laya. The highest confident label wins:
 
 | Bump | Meaning |
