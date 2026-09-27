@@ -2,15 +2,16 @@
 
 GitHub Action that decides whether the next release is **major**, **minor** or **patch** by classifying each commit message since the latest version tag (`1.2.3` or `v1.2.3`) with [laya](https://github.com/NandhaKishorM/laya).
 
-Each commit gets one of three labels; the highest confident one wins:
+Each commit message, together with its changed file names, gets one of four labels; the highest confident one wins:
 
 | Bump | Meaning |
 |---|---|
 | major | breaks existing users: removes or renames API, flags or behavior |
 | minor | adds a new feature, option or command |
-| patch | fixes a bug, or changes only docs, dependencies, tests or internals |
+| patch | fixes a bug, or changes dependencies or internals |
+| none | changes only documentation, tests or CI configuration |
 
-Decisions below `min-confidence` are ignored. If commits exist but none is confident, `fallback-bump` is used. Without commits since the tag, the bump is `none`.
+Decisions below `min-confidence` are ignored. If commits exist but none is confident, `fallback-bump` is used. Without commits since the tag, or when every confident decision is `none`, the bump is `none` and no release should be made.
 
 ## Usage
 

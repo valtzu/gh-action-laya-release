@@ -18,8 +18,18 @@ QUESTIONS = {
             "B": "adds a new feature, option or command",
             "C": "fixes a bug, or changes only docs, dependencies, tests or internals",
         },
-    }
+    },
+    "scope": {
+        "type": "choice",
+        "instructions": "Which files does this commit change?",
+        "criteria": {
+            "A": "source code or dependencies",
+            "B": "only documentation, tests or CI configuration",
+        },
+    },
 }
+
+MAX_LISTED_FILES = 20
 
 TAG_PATTERN = re.compile(r"^(v?)(\d+)\.(\d+)\.(\d+)$")
 
@@ -41,15 +51,28 @@ def latest_tag(tags):
     return max(versions, key=lambda tag: versions[tag][1], default=None)
 
 
-def commit_messages(since_tag, head):
+def commits_since(since_tag, head):
     revision_range = f"{since_tag}..{head}" if since_tag else head
-    log = git("log", "--no-merges", "--format=%H%x1f%B%x1e", revision_range)
+    log = git("log", "--no-merges", "--name-only", "--format=%x1e%H%x1f%B%x1f", revision_range)
     commits = []
     for record in log.split("\x1e"):
         if record.strip():
-            sha, message = record.strip().split("\x1f", 1)
-            commits.append({"sha": sha, "message": message.strip()})
+            sha, message, files = record.split("\x1f")
+            commits.append({"sha": sha.strip(), "message": message.strip(), "files": files.split()})
     return commits
+
+
+def describe(commit):
+    if not commit["files"]:
+        return commit["message"]
+    files = "\n".join(commit["files"][:MAX_LISTED_FILES])
+    return f"{commit['message']}\n\nChanged files:\n{files}"
+
+
+def decide(answers):
+    if answers["scope"]["choice"] == "B":
+        return "none", answers["scope"]["answer_confidence"]
+    return LABEL_BUMPS[answers["bump"]["choice"]], answers["bump"]["answer_confidence"]
 
 
 def bump_version(version, bump):
@@ -79,20 +102,28 @@ def highest_bump(decisions, min_confidence, fallback):
 def classify(commits, model):
     from laya import Router
 
-    requests = [{"state": c["message"], "questions": QUESTIONS, "model": model} for c in commits]
+    requests = [{"state": describe(c), "questions": QUESTIONS, "model": model} for c in commits]
     results = Router().predict_batch(requests) if requests else []
-    return [
-        {
-            "sha": commit["sha"],
-            "subject": commit["message"].splitlines()[0],
-            "bump": LABEL_BUMPS[result["answers"]["bump"]["choice"]],
-            "confidence": result["answers"]["bump"]["answer_confidence"],
-        }
-        for commit, result in zip(commits, results)
-    ]
+    decisions = []
+    for commit, result in zip(commits, results):
+        bump, confidence = decide(result["answers"])
+        decisions.append(
+            {
+                "sha": commit["sha"],
+                "subject": commit["message"].splitlines()[0],
+                "bump": bump,
+                "confidence": confidence,
+            }
+        )
+    return decisions
 
 
-CHANGELOG_SECTIONS = {"major": "Breaking changes", "minor": "Features", "patch": "Fixes and maintenance"}
+CHANGELOG_SECTIONS = {
+    "major": "Breaking changes",
+    "minor": "Features",
+    "patch": "Fixes and maintenance",
+    "none": "Other changes",
+}
 
 
 def changelog(decisions):
@@ -143,7 +174,7 @@ def main():
 
     tag = latest_tag(git("tag", "--merged", head).split())
     prefix, current = parse_tag(tag) if tag else ("v", (0, 0, 0))
-    decisions = classify(commit_messages(tag, head), model)
+    decisions = classify(commits_since(tag, head), model)
     bump = highest_bump(decisions, min_confidence, fallback)
     next_version = format_version(bump_version(current, bump))
 
