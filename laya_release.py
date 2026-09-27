@@ -20,18 +20,24 @@ QUESTIONS = {
     }
 }
 
-VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+TAG_PATTERN = re.compile(r"^(v?)(\d+)\.(\d+)\.(\d+)$")
 
 
 def git(*args):
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
 
 
-def latest_tag(prefix):
-    try:
-        return git("describe", "--tags", "--abbrev=0", "--match", f"{prefix}[0-9]*").strip()
-    except subprocess.CalledProcessError:
+def parse_tag(tag):
+    match = TAG_PATTERN.match(tag)
+    if not match:
         return None
+    prefix, *version = match.groups()
+    return prefix, tuple(int(part) for part in version)
+
+
+def latest_tag(tags):
+    versions = {tag: parsed for tag in tags if (parsed := parse_tag(tag))}
+    return max(versions, key=lambda tag: versions[tag][1], default=None)
 
 
 def commit_messages(since_tag, head):
@@ -43,13 +49,6 @@ def commit_messages(since_tag, head):
             sha, message = record.strip().split("\x1f", 1)
             commits.append({"sha": sha, "message": message.strip()})
     return commits
-
-
-def parse_version(tag, prefix):
-    match = VERSION_PATTERN.match(tag[len(prefix):]) if tag and tag.startswith(prefix) else None
-    if not match:
-        raise ValueError(f"Tag {tag!r} is not a {prefix}MAJOR.MINOR.PATCH version")
-    return tuple(int(part) for part in match.groups())
 
 
 def bump_version(version, bump):
@@ -121,7 +120,6 @@ def write_summary(decisions, outputs):
 
 
 def main():
-    prefix = os.environ["INPUT_TAG_PREFIX"]
     head = os.environ["INPUT_HEAD"]
     model = os.environ["INPUT_MODEL"] or None
     min_confidence = float(os.environ["INPUT_MIN_CONFIDENCE"])
@@ -129,8 +127,8 @@ def main():
     if fallback not in BUMPS:
         sys.exit(f"fallback-bump must be one of {', '.join(BUMPS)}")
 
-    tag = latest_tag(prefix)
-    current = parse_version(tag, prefix) if tag else (0, 0, 0)
+    tag = latest_tag(git("tag", "--merged", head).split())
+    prefix, current = parse_tag(tag) if tag else ("v", (0, 0, 0))
     decisions = classify(commit_messages(tag, head), model)
     bump = highest_bump(decisions, min_confidence, fallback)
     next_version = format_version(bump_version(current, bump))

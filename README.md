@@ -1,6 +1,6 @@
 # Laya release bump
 
-GitHub Action that decides whether the next release is **major**, **minor** or **patch** by classifying each commit message since the latest version tag with [laya](https://github.com/NandhaKishorM/laya).
+GitHub Action that decides whether the next release is **major**, **minor** or **patch** by classifying each commit message since the latest version tag (`1.2.3` or `v1.2.3`) with [laya](https://github.com/NandhaKishorM/laya).
 
 Each commit gets one of three labels; the highest confident one wins:
 
@@ -43,7 +43,6 @@ jobs:
 
 | Name | Default | Description |
 |---|---|---|
-| `tag-prefix` | `v` | Prefix of version tags |
 | `head` | `HEAD` | Revision to compare against the latest version tag |
 | `model` | `english` | Laya checkpoint (`english`, `multilingual`, `typed-decisions`); empty lets the router pick |
 | `min-confidence` | `0.4` | Ignore decisions below this confidence |
@@ -55,11 +54,11 @@ jobs:
 
 | Name | Description |
 |---|---|
-| `previous-tag` | Latest version tag, empty if none |
+| `previous-tag` | Highest version tag reachable from `head`, empty if none |
 | `current-version` | Version of that tag, `0.0.0` if none |
 | `bump` | `none`, `patch`, `minor` or `major` |
 | `next-version` | Next version without prefix |
-| `next-tag` | Next version with prefix |
+| `next-tag` | Next version with the previous tag's prefix (`v` if no previous tag) |
 | `decisions` | JSON array of per-commit decisions |
 
 A per-commit table is also written to the job summary.

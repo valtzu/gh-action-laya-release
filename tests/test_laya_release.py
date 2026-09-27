@@ -1,15 +1,24 @@
 import pytest
 
-from laya_release import bump_version, highest_bump, parse_version
+from laya_release import bump_version, highest_bump, latest_tag, parse_tag
 
 
-def test_parse_version_strips_prefix():
-    assert parse_version("v1.2.3", "v") == (1, 2, 3)
+@pytest.mark.parametrize("tag, expected", [("v1.2.3", ("v", (1, 2, 3))), ("1.2.3", ("", (1, 2, 3)))])
+def test_parse_tag(tag, expected):
+    assert parse_tag(tag) == expected
 
 
-def test_parse_version_rejects_non_semver():
-    with pytest.raises(ValueError):
-        parse_version("v1.2", "v")
+@pytest.mark.parametrize("tag", ["v1.2", "release-1.2.3", "1.2.3-rc1"])
+def test_parse_tag_ignores_non_semver(tag):
+    assert parse_tag(tag) is None
+
+
+def test_latest_tag_picks_highest_version_regardless_of_prefix():
+    assert latest_tag(["v1.9.0", "1.10.0", "nightly", "v1.2.3"]) == "1.10.0"
+
+
+def test_latest_tag_is_none_without_version_tags():
+    assert latest_tag(["nightly"]) is None
 
 
 @pytest.mark.parametrize(
