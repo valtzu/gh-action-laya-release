@@ -16,8 +16,12 @@ jobs:
       - run: python -m pip install pytest
       - run: python -m pytest -q tests
 
-  self:
+  release:
+    needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency: release
     steps:
       - uses: actions/checkout@v5
         with:
@@ -25,3 +29,7 @@ jobs:
       - id: bump
         uses: ./
       - run: echo "${{ steps.bump.outputs.current-version }} -> ${{ steps.bump.outputs.next-version }} (${{ steps.bump.outputs.bump }})"
+      - if: github.event_name == 'push' && steps.bump.outputs.bump != 'none'
+        run: gh release create "${{ steps.bump.outputs.next-tag }}" --target "$GITHUB_SHA" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
